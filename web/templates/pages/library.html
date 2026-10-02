@@ -15,7 +15,7 @@
         {{range .AudioCodecs}}<option {{if eq . $.Data.Filter.Audio}}selected{{end}}>{{.}}</option>{{end}}
       </select>
       {{template "sort-state" .}}
-      <a class="btn ghost" href="/">{{icon "x"}}Clear</a>
+      <a class="btn ghost" href="/" hx-boost="false">{{icon "x"}}Clear</a>
       <button type="button" class="btn" hx-post="/videos/refresh" hx-swap="none">{{icon "refresh"}}Rescan</button>
     </form>
     {{template "videos" .}}
