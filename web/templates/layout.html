@@ -1,0 +1,27 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · GodeXvert</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/htmx-sse.js"></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body hx-boost="true" hx-ext="sse" sse-connect="/events">
+  <header class="top">
+    <a class="brand" href="/"><span class="mark">{{icon "convert"}}</span><span>Gode<span class="x">X</span>vert</span></a>
+    <nav>
+      <a href="/" {{if eq .Nav "library"}}aria-current="page"{{end}}>{{icon "film"}}<span>Library</span></a>
+      <a href="/jobs" {{if eq .Nav "jobs"}}aria-current="page"{{end}}>{{icon "activity"}}<span>Jobs</span></a>
+      <a href="/backups" {{if eq .Nav "backups"}}aria-current="page"{{end}}>{{icon "archive"}}<span>Backups</span></a>
+      <a href="/settings" {{if eq .Nav "settings"}}aria-current="page"{{end}}>{{icon "sliders"}}<span>Settings</span></a>
+    </nav>
+    {{template "jobs-indicator" .Jobs}}
+  </header>
+  <main class="{{.Nav}}">{{template "content" .}}</main>
+  <div id="toasts" aria-live="polite" sse-swap="toast" hx-swap="beforeend"></div>
+</body>
+</html>{{end}}

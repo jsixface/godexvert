@@ -1,0 +1,271 @@
+{{define "toast"}}<div class="toast {{.Kind}}" role="status">{{if eq .Kind "err"}}{{icon "alert"}}{{else}}{{icon "check"}}{{end}}<span>{{.Msg}}</span></div>{{end}}
+
+{{define "toast-oob"}}<div hx-swap-oob="beforeend:#toasts">{{template "toast" .}}</div>{{end}}
+
+{{define "jobs-indicator"}}
+<span id="jobs-indicator" class="ind-wrap" sse-swap="jobs-indicator" hx-swap="outerHTML">
+<a href="/jobs" class="indicator{{if .}} busy{{end}}"
+   title="{{with running .}}Converting {{.File.Name}}{{else}}No conversions running{{end}}">
+  {{with running .}}
+    <span class="pulse"></span>
+    <span class="ind-name">{{.File.Name}}</span>
+    <b>{{if eq .Status "InProgress"}}{{.Progress}}%{{else}}starting{{end}}</b>
+  {{else}}{{if not .}}{{icon "check"}}<span class="ind-name">Idle</span>{{end}}{{end}}
+  {{with queued .}}<span class="count">{{.}} queued</span>{{end}}
+</a>
+</span>
+{{end}}
+
+{{define "sort-state"}}<span id="sort-state"{{if .OOB}} hx-swap-oob="true"{{end}}><input type="hidden" name="sort" value="{{.Sort}}"><input type="hidden" name="dir" value="{{if .Desc}}desc{{else}}asc{{end}}"></span>{{end}}
+
+{{define "videos"}}
+<div id="videos" hx-get="/" hx-include="#filters" hx-trigger="sse:library-changed delay:300ms" hx-sync="this:replace"
+     hx-swap="outerHTML" hx-disinherit="*">
+  {{if .OOB}}{{template "sort-state" .}}{{end}}
+  <p class="muted count">{{if eq (len .Files) .Total}}{{.Total}} files{{else}}{{len .Files}} of {{.Total}} files{{end}} · {{size .SizeMB}}</p>
+  <div class="table-wrap">
+  <table class="files">
+    <thead><tr>
+      {{range .Columns}}
+      <th class="{{.Class}}">{{if .Key}}<a class="sort{{if .Active}} active{{end}}" href="{{.Href}}" hx-get="{{.Href}}"
+          hx-target="#videos" hx-swap="outerHTML" hx-push-url="true">{{.Label}}{{if .Active}}{{if .Desc}}{{icon "down"}}{{else}}{{icon "up"}}{{end}}{{end}}</a>{{else}}{{.Label}}{{end}}</th>
+      {{end}}
+    </tr></thead>
+    <tbody>
+    {{range .Files}}
+      <tr class="clickable" tabindex="0" hx-get="/videos/detail?path={{qs .Path}}" hx-target="#detail"
+          hx-trigger="click, keyup[key=='Enter']">
+        <td class="name"><div class="fname">{{.Name}}</div><div class="fdir muted">{{dir (rel .Path)}}</div></td>
+        <td>{{with res .}}{{if .Label}}<span class="badge {{.Class}}">{{.Label}}</span>{{end}}{{end}}</td>
+        <td>{{range codecs .Videos}}<span class="badge {{codecClass "video" .}}">{{.}}</span>{{end}}</td>
+        <td>{{range codecs .Audios}}<span class="badge {{codecClass "audio" .}}">{{.}}</span>{{end}}</td>
+        <td class="hide-sm muted">{{with len .Subtitles}}{{.}}{{else}}—{{end}}</td>
+        <td class="hide-sm muted nowrap">{{day .Added}}</td>
+        <td class="num">{{size .SizeMB}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="7">
+        {{if .Total}}
+        <div class="empty">{{icon "search"}}<p class="empty-title">No matching files</p>
+          <p class="muted">Try a different name or codec filter.</p><a class="btn" href="/">Clear filters</a></div>
+        {{else}}
+        <div class="empty">{{icon "folder"}}<p class="empty-title">Your library is empty</p>
+          <p class="muted">Add the folders that hold your videos, then rescan.</p>
+          <a class="btn primary" href="/settings">{{icon "sliders"}}Open settings</a></div>
+        {{end}}
+      </td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</div>
+{{end}}
+
+{{define "detail"}}
+<div class="card detail-card">
+  <div class="card-head">
+    <div class="title">
+      <h2>{{.File.Name}}</h2>
+      <div class="badges">
+        {{with res .File}}{{if .Label}}<span class="badge {{.Class}}">{{.Label}}</span>{{end}}{{end}}
+        {{range codecs .File.Videos}}<span class="badge {{codecClass "video" .}}">{{.}}</span>{{end}}
+        {{range codecs .File.Audios}}<span class="badge {{codecClass "audio" .}}">{{.}}</span>{{end}}
+        <span class="badge">{{size .File.SizeMB}}</span>
+      </div>
+    </div>
+    <button type="button" class="icon-btn" aria-label="Close" hx-on:click="document.getElementById('detail').innerHTML=''">{{icon "x"}}</button>
+  </div>
+  <dl class="meta">
+    <div title="{{.File.Path}}">{{icon "folder"}}<span>{{dir (rel .File.Path)}}</span></div>
+    <div>{{icon "clock"}}<span>Modified {{millis .File.Modified}}</span></div>
+  </dl>
+  {{if .Error}}<p class="notice err">{{icon "alert"}}{{.Error}}</p>{{end}}
+  {{if .Queued}}<p class="notice ok">{{icon "check"}}<span>Queued for conversion. Follow it on the <a href="/jobs">Jobs</a> page.</span></p>{{end}}
+  <form hx-post="/videos/convert" hx-target="#detail">
+    <input type="hidden" name="path" value="{{.File.Path}}">
+    {{range $t := .File.Tracks}}
+    <fieldset class="track">
+      <legend class="track-head">
+        <span class="kind k-{{.Kind}}">{{icon (print .Kind)}}</span>
+        <span class="badge {{codecClass .Kind .Codec}}">{{.Codec}}</span>
+        {{with .Language}}<span class="badge lang">{{upper .}}</span>{{end}}
+        <span class="muted idx">#{{.Index}}</span>
+      </legend>
+      {{with facts .}}<div class="facts">{{range .}}<span>{{.}}</span>{{end}}</div>{{end}}
+      <div class="choices">
+        {{$sel := index $.Selected .Index}}
+        <label><input type="radio" name="t{{.Index}}" value="copy" {{if eq $sel "copy"}}checked{{end}}> Keep</label>
+        <label class="drop"><input type="radio" name="t{{.Index}}" value="drop" {{if eq $sel "drop"}}checked{{end}}> Remove</label>
+        {{range targets .}}{{$v := printf "convert:%s" .Name}}
+        <label><input type="radio" name="t{{$t.Index}}" value="{{$v}}" {{if eq $sel $v}}checked{{end}}> → {{.Name}}</label>
+        {{end}}
+      </div>
+    </fieldset>
+    {{else}}<p class="muted">No tracks found.</p>{{end}}
+    <div class="actions"><button class="btn primary" {{if .Queued}}disabled{{end}}>{{icon "convert"}}Convert</button></div>
+  </form>
+</div>
+{{end}}
+
+{{define "jobs"}}
+<div id="jobs" hx-get="/jobs?page={{.Page}}&limit={{.Limit}}" hx-trigger="sse:jobs-changed delay:200ms, jobs-changed from:body"
+     hx-sync="this:replace" hx-swap="outerHTML" hx-disinherit="*">
+  <div class="tiles">
+    {{$run := running .Active}}
+    <div class="tile{{if $run}} t-run{{end}}">
+      <span class="tile-label">{{icon "activity"}}Running</span>
+      {{with $run}}<b class="tile-value" sse-swap="running-pct" hx-swap="innerHTML">{{template "pct" .}}</b>
+      <span class="tile-sub" title="{{.File.Name}}">{{.File.Name}}</span>
+      {{else}}<b class="tile-value">—</b><span class="tile-sub">Idle</span>{{end}}
+    </div>
+    <div class="tile"><span class="tile-label">{{icon "clock"}}Queued</span><b class="tile-value">{{queued .Active}}</b><span class="tile-sub">waiting</span></div>
+    <div class="tile t-ok"><span class="tile-label">{{icon "check"}}Completed</span><b class="tile-value">{{index .Counts "Completed"}}</b><span class="tile-sub">all time</span></div>
+    <div class="tile t-err"><span class="tile-label">{{icon "alert"}}Failed</span><b class="tile-value">{{index .Counts "Failed"}}</b><span class="tile-sub">{{with index .Counts "Cancelled"}}{{.}} cancelled{{else}}all time{{end}}</span></div>
+  </div>
+
+  <section>
+    <h2>Active</h2>
+    {{range .Active}}{{template "job" .}}{{else}}
+    <div class="empty slim">{{icon "activity"}}<p class="empty-title">Nothing converting</p>
+      <p class="muted">Pick a file in the <a href="/">Library</a> to convert it, or add auto-conversion rules in <a href="/settings">Settings</a>.</p></div>
+    {{end}}
+  </section>
+  <section>
+    <h2>History</h2>
+    {{if .History}}
+    <div class="table-wrap">
+    <table class="history">
+      <thead><tr><th>File</th><th>Status</th><th class="hide-sm">Queued</th><th class="num">Duration</th></tr></thead>
+      <tbody>
+      {{range .History}}
+        <tr>
+          <td class="name"><div class="fname">{{.FileName}}</div>{{with .Error}}<div class="err-line" title="{{.}}">{{.}}</div>{{end}}</td>
+          <td>{{template "status" .Status}}</td>
+          <td class="hide-sm muted nowrap">{{when .StartedAt}}</td>
+          <td class="num">{{dur .Duration}}</td>
+        </tr>
+      {{end}}
+      </tbody>
+    </table>
+    </div>
+    <nav class="pager">
+      <form hx-get="/jobs" hx-target="#jobs" hx-swap="outerHTML" hx-push-url="true" hx-trigger="change">
+        <input type="hidden" name="page" value="1">
+        <label class="muted">Per page
+          <select name="limit">{{range .Limits}}<option {{if eq . $.Limit}}selected{{end}}>{{.}}</option>{{end}}</select>
+        </label>
+      </form>
+      <span class="spacer"></span>
+      {{if gt .Page 1}}<a class="btn" href="/jobs?page={{sub .Page 1}}&limit={{.Limit}}">‹ Prev</a>{{end}}
+      <span class="muted">Page {{.Page}} of {{.Pages}}</span>
+      {{if lt .Page .Pages}}<a class="btn" href="/jobs?page={{add .Page 1}}&limit={{.Limit}}">Next ›</a>{{end}}
+    </nav>
+    {{else}}
+    <div class="empty slim">{{icon "clock"}}<p class="empty-title">No finished jobs yet</p></div>
+    {{end}}
+  </section>
+</div>
+{{end}}
+
+{{define "pct"}}{{if eq .Status "InProgress"}}{{.Progress}}%{{else}}…{{end}}{{end}}
+
+{{define "status"}}
+{{- if eq (print .) "Completed"}}<span class="status s-Completed">{{icon "check"}}Completed</span>
+{{- else if eq (print .) "Failed"}}<span class="status s-Failed">{{icon "alert"}}Failed</span>
+{{- else if eq (print .) "Cancelled"}}<span class="status s-Cancelled">{{icon "ban"}}Cancelled</span>
+{{- else if eq (print .) "Queued"}}<span class="status">{{icon "clock"}}Queued</span>
+{{- else}}<span class="status s-Running">{{icon "activity"}}{{.}}</span>{{end -}}
+{{end}}
+
+{{define "job"}}
+<div class="job card" id="job-{{.ID}}" sse-swap="job-{{.ID}}" hx-swap="outerHTML" hx-disinherit="*">
+  <div class="job-head">
+    <span class="kind k-video">{{icon "convert"}}</span>
+    <div class="job-title">
+      <b class="fname" title="{{.File.Path}}">{{.File.Name}}</b>
+      <small class="muted">{{specs .}} · queued {{when .StartedAt}}</small>
+    </div>
+    {{if eq .Status "InProgress"}}<b class="pct">{{.Progress}}%</b>{{else}}{{template "status" .Status}}{{end}}
+    {{if .Status.Active}}
+    <button class="btn small" hx-delete="/jobs/{{.ID}}" hx-swap="none"
+            hx-confirm="{{if eq .Status "Queued"}}Remove {{.File.Name}} from the queue?{{else}}Stop converting {{.File.Name}}?{{end}}">
+      {{if eq .Status "Queued"}}{{icon "x"}}Remove{{else}}{{icon "stop"}}Stop{{end}}</button>
+    {{end}}
+  </div>
+  {{if eq .Status "InProgress"}}<div class="bar"><span style="width: {{.Progress}}%"></span></div>
+  {{else if eq .Status "Starting"}}<div class="bar indeterminate"><span></span></div>{{end}}
+</div>
+{{end}}
+
+{{define "backups"}}
+<div id="backups">
+  {{if .Backups}}
+  <div class="toolbar">
+    <span class="muted">{{len .Backups}} backups · {{size .SizeMB}}</span>
+    <button class="btn danger" hx-delete="/backups" hx-target="#backups" hx-swap="outerHTML"
+            hx-confirm="Delete all {{len .Backups}} backups? This cannot be undone.">{{icon "trash"}}Delete all</button>
+  </div>
+  <div class="table-wrap">
+  <table class="backups">
+    <thead><tr><th>File</th><th class="hide-sm">Taken</th><th class="num">Size</th><th></th></tr></thead>
+    <tbody>
+    {{range .Backups}}
+      <tr>
+        <td class="name"><div class="fname">{{.Name}}</div><div class="fdir muted" title="{{.Path}}">{{dir (rel .Path)}}</div></td>
+        <td class="hide-sm muted nowrap">{{when .Time}}</td>
+        <td class="num">{{size .SizeMB}}</td>
+        <td class="num"><button class="btn small ghost" hx-delete="/backups/item?path={{qs .Path}}" hx-target="closest tr"
+            hx-swap="outerHTML" hx-confirm="Delete {{.Name}}?" aria-label="Delete {{.Name}}">{{icon "trash"}}</button></td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <div class="empty">{{icon "archive"}}<p class="empty-title">No backups</p>
+    <p class="muted">When "Keep original files" is on, each converted file's original is kept here until you delete it.</p></div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "settings"}}
+<form id="settings" class="settings" method="post" action="/settings" hx-post="/settings" hx-swap="outerHTML" hx-disinherit="*">
+  {{if .Saved}}<p class="notice ok">{{icon "check"}}Settings saved.</p>{{end}}
+  {{range .Errors}}<p class="notice err">{{icon "alert"}}{{.}}</p>{{end}}
+  <div class="settings-grid">
+  <fieldset class="wide">
+    <legend>{{icon "folder"}}Library locations</legend>
+    <textarea name="locations" rows="4" placeholder="/media/movies" spellcheck="false">{{join .S.LibraryLocations "\n"}}</textarea>
+    <small class="muted">One absolute directory per line. Scanned recursively and watched for changes.</small>
+  </fieldset>
+  <fieldset>
+    <legend>{{icon "film"}}Video extensions</legend>
+    <input name="extensions" value="{{join .S.VideoExtensions ", "}}" spellcheck="false">
+    <small class="muted">Comma separated.</small>
+  </fieldset>
+  <fieldset>
+    <legend>{{icon "convert"}}Auto conversion</legend>
+    <small class="muted">New or changed files with a matching audio track are converted automatically.</small>
+    <div id="autoconv">{{range $from, $to := .S.AutoConversion.Conversion}}{{template "autoconv-row" (rule $from $to)}}{{end}}</div>
+    <div><button type="button" class="btn small" hx-get="/settings/autoconv-row" hx-target="#autoconv" hx-swap="beforeend">{{icon "plus"}}Add rule</button></div>
+  </fieldset>
+  <fieldset class="wide">
+    <legend>{{icon "archive"}}Workspace &amp; safety</legend>
+    <label for="workspace">Workspace directory</label>
+    <input id="workspace" name="workspace" value="{{.S.WorkspaceLocation}}" spellcheck="false">
+    <small class="muted">Conversions are written here before replacing the original.</small>
+    <label class="check"><input type="checkbox" name="takeBackups" {{if .S.TakeBackups}}checked{{end}}> Keep original files as backups</label>
+  </fieldset>
+  </div>
+  <div class="actions"><button class="btn primary">{{icon "save"}}Save settings</button></div>
+</form>
+{{end}}
+
+{{define "autoconv-row"}}
+<div class="autoconv-row">
+  <select name="from" aria-label="From codec">{{range audioCodecs}}<option {{if eq .Name $.From}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+  <span class="muted">→</span>
+  <select name="to" aria-label="To codec">{{range audioCodecs}}<option {{if eq .Name $.To}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+  <button type="button" class="icon-btn" aria-label="Remove rule" hx-on:click="this.closest('.autoconv-row').remove()">{{icon "trash"}}</button>
+</div>
+{{end}}

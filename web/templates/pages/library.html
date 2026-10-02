@@ -1,0 +1,28 @@
+{{define "content"}}{{with .Data}}
+<div class="split">
+  <section class="list">
+    <form id="filters" class="filters" action="/" hx-get="/" hx-target="#videos" hx-swap="outerHTML"
+          hx-push-url="true" hx-trigger="input delay:300ms, submit">
+      <label class="search">{{icon "search"}}
+        <input type="search" name="name" value="{{.Filter.Name}}" placeholder="Filter by name" aria-label="File name">
+      </label>
+      <select name="video" aria-label="Video codec">
+        <option value="">All video codecs</option>
+        {{range .VideoCodecs}}<option {{if eq . $.Data.Filter.Video}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      <select name="audio" aria-label="Audio codec">
+        <option value="">All audio codecs</option>
+        {{range .AudioCodecs}}<option {{if eq . $.Data.Filter.Audio}}selected{{end}}>{{.}}</option>{{end}}
+      </select>
+      {{template "sort-state" .}}
+      <a class="btn ghost" href="/">{{icon "x"}}Clear</a>
+      <button type="button" class="btn" hx-post="/videos/refresh" hx-swap="none">{{icon "refresh"}}Rescan</button>
+    </form>
+    {{template "videos" .}}
+  </section>
+  <aside id="detail" class="detail">
+    <div class="empty">{{icon "film"}}<p class="empty-title">No file selected</p>
+      <p class="muted">Pick a file to see its tracks and choose what to convert.</p></div>
+  </aside>
+</div>
+{{end}}{{end}}
