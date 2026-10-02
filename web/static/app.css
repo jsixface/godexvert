@@ -208,3 +208,5 @@ th.num .sort { justify-content: flex-end; }
   .toast { animation-name: toast-fade; } .pulse, .bar.indeterminate span { animation: none; }
   @keyframes toast-fade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
 }
+.eta { font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.indicator .eta { opacity: .75; }

@@ -25,6 +25,7 @@ func (s *Server) funcs() template.FuncMap {
 		"day":         func(ms int64) string { return time.UnixMilli(ms).Local().Format("2006-01-02") },
 		"millis":      func(ms int64) string { return when(time.UnixMilli(ms)) },
 		"dur":         dur,
+		"eta":         eta,
 		"icon":        icon,
 		"codecs":      codecs,
 		"codecClass":  codecClass,
@@ -60,6 +61,15 @@ func when(t time.Time) string {
 		return "—"
 	}
 	return t.Local().Format("2006-01-02 15:04")
+}
+
+// eta estimates the time left from elapsed run time and percent done; empty until there is a basis.
+func eta(j convert.Job) string {
+	if j.Status != convert.InProgress || j.Progress <= 0 || j.Progress >= 100 || j.RunStart.IsZero() {
+		return ""
+	}
+	left := time.Since(j.RunStart) * time.Duration(100-j.Progress) / time.Duration(j.Progress)
+	return "~" + dur(left) + " left"
 }
 
 func dur(d time.Duration) string {

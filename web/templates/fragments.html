@@ -10,6 +10,7 @@
     <span class="pulse"></span>
     <span class="ind-name">{{.File.Name}}</span>
     <b>{{if eq .Status "InProgress"}}{{.Progress}}%{{else}}starting{{end}}</b>
+    {{with eta .}}<span class="eta">{{.}}</span>{{end}}
   {{else}}{{if not .}}{{icon "check"}}<span class="ind-name">Idle</span>{{end}}{{end}}
   {{with queued .}}<span class="count">{{.}} queued</span>{{end}}
 </a>
@@ -185,7 +186,7 @@
       <b class="fname" title="{{.File.Path}}">{{.File.Name}}</b>
       <small class="muted">{{specs .}} · queued {{when .StartedAt}}</small>
     </div>
-    {{if eq .Status "InProgress"}}<b class="pct">{{.Progress}}%</b>{{else}}{{template "status" .Status}}{{end}}
+    {{if eq .Status "InProgress"}}<b class="pct">{{.Progress}}%</b>{{with eta .}}<span class="eta muted">{{.}}</span>{{end}}{{else}}{{template "status" .Status}}{{end}}
     {{if .Status.Active}}
     <button class="btn small" hx-delete="/jobs/{{.ID}}" hx-swap="none"
             hx-confirm="{{if eq .Status "Queued"}}Remove {{.File.Name}} from the queue?{{else}}Stop converting {{.File.Name}}?{{end}}">

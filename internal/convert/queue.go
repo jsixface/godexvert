@@ -41,6 +41,7 @@ type Job struct {
 	Status    Status
 	Progress  int
 	StartedAt time.Time // when the job was queued, as in the Kotlin app
+	RunStart  time.Time // when ffmpeg began, for the ETA
 }
 
 // JobSaver records finished jobs.
@@ -180,12 +181,13 @@ func (q *Queue) set(e *entry, fn func(*entry)) {
 
 func (q *Queue) process(ctx, jctx context.Context, e *entry) {
 	defer e.cancel()
+	start := time.Now()
 	q.mu.Lock()
+	e.RunStart = start
 	snap := e.Job
 	q.mu.Unlock()
 	q.OnUpdate(snap)
 
-	start := time.Now()
 	settings := q.cfg.Get()
 	dir := filepath.Join(settings.WorkspaceLocation, e.ID)
 	err := q.convert(jctx, e, dir, settings.TakeBackups)
